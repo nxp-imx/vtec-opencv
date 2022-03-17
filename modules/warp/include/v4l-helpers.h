@@ -4,11 +4,14 @@
  * v4l2 functions.
  *
  * Copyright 2014-2016 Cisco Systems, Inc. and/or its affiliates. All rights reserved.
+ * Copyright 2022 NXP
+ *
  */
 
 #ifndef _V4L_HELPERS_H_
 #define _V4L_HELPERS_H_
 
+#include <linux/version.h>
 #include <linux/videodev2.h>
 #include <string.h>
 #include <stdlib.h>
@@ -1523,7 +1526,9 @@ static inline int v4l_queue_reqbufs(struct v4l_fd *f,
 	reqbufs.type = q->type;
 	reqbufs.memory = q->memory;
 	reqbufs.count = count;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 16, 0)
 	reqbufs.flags = flags;
+#endif
 	/*
 	 * Problem: if REQBUFS returns an error, did it free any old
 	 * buffers or not?
@@ -1556,7 +1561,10 @@ static inline int v4l_queue_create_bufs(struct v4l_fd *f,
 	createbufs.format.type = q->type;
 	createbufs.memory = q->memory;
 	createbufs.count = count;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 16, 0)
 	createbufs.flags = flags;
+#endif
+
 	if (fmt) {
 		createbufs.format = *fmt;
 	} else {
