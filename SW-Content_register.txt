@@ -1,0 +1,32 @@
+NXP Software Content Register
+
+Package:                  OpenCV NXP Edge Processing modules
+Data Created:             2022 March 18
+Outgoing License:         Apache 2.0
+Type of content:          Source code
+
+-------------------------------------------------------------------------------
+
+Location:           * (except: modules/warp/include/*v4l-helpers.h)
+
+Origin:             NXP Semiconductors
+
+Outgoing License:   Apache 2.0
+
+License file:       LICENSE
+
+-------------------------------------------------------------------------------
+
+Locations:          modules/warp/include/cv4l-helpers.h
+                    modules/warp/include/v4l-helpers.h
+
+Origin:             V4L-utils 1.22 (https://git.linuxtv.org/v4l-utils.git/tree/utils?h=stable-1.22)
+                    https://git.linuxtv.org/v4l-utils.git/tree/utils/common/cv4l-helpers.h?h=stable-1.22
+                    https://git.linuxtv.org/v4l-utils.git/tree/utils/common/v4l-helpers.h?h=stable-1.22
+
+                    GPL-2.0-only OR BSD-3-Clause
+
+Outgoing License:   BSD-3-Clause
+License file:       LICENSES/COPYING.BSD-3-Clause
+
+-------------------------------------------------------------------------------
