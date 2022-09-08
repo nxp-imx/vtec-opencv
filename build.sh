@@ -239,6 +239,7 @@ do_install() {
         "${ROOTFS_DIR}/usr/lib/python3.9/site-packages/cv2"
 
     sudomize ${ROOTFS_DIR} rsync -arz "${BUILD_DIR}/install/" "${ROOTFS_DIR}/usr/"
+    sudomize ${ROOTFS_DIR} rsync -arz "${BUILD_DIR}/install/" "${SDKTARGETSYSROOT}/usr/"
 
     cd "${ROOTFS_DIR}/usr/lib/python3.9/site-packages/cv2/python-3.9" || fatal "cv2 python library folder does not exist"
     if [ -e cv2.cpython-39-x86_64-linux-gnu.so ];
