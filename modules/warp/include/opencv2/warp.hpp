@@ -64,11 +64,6 @@ public:
      */
     CV_WRAP int setMap(InputArray map);
     /**
-     * @brief Cancel the user provided dewarping mapping.
-     * This forces the driver to use an identity map for next active stream.
-     */
-    CV_WRAP int cancelMap();
-    /**
      * @brief Compute the output image
      * @param inImg Input array of streams
      * @param inImg Output array of streams

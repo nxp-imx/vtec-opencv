@@ -192,42 +192,6 @@ int Warper::setMap(InputArray &map)
     return ret;
 }
 
-int Warper::cancelMap()
-{
-    struct v4l2_ext_controls ctrls;
-    struct v4l2_ext_control ectrl;
-    uint32_t *data;
-    int ret;
-
-    if (isStreaming)
-        return 1;
-    if (mapping.empty())
-        return 1;
-
-    data = reinterpret_cast<uint32_t*>(mapping.data);
-
-    CV_LOG_INFO(NULL, "Cancelling Look up table.");
-
-    memset(&ectrl, 0, sizeof(ectrl));
-    ectrl.id = V4L2_CID_DW100_DEWARPING_16x16_VERTEX_MAP;
-    ectrl.p_u32 = data;
-    ectrl.size = 4;
-
-    memset(&ctrls, 0, sizeof(ctrls));
-    ctrls.which = V4L2_CTRL_WHICH_CUR_VAL;
-    ctrls.count = 1;
-    ctrls.controls = &ectrl;
-
-    ret = c_fd.s_ext_ctrls(ctrls);
-
-    if (!ret)
-        mapping = Mat();
-    else
-        CV_LOG_ERROR(NULL, "Error while cancelling Look Up table");
-
-    return ret;
-}
-
 int Warper::write(InputArrayOfArrays images)
 {
     unsigned nimages = images.rows();
