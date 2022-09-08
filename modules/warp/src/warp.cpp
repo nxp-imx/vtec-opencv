@@ -33,15 +33,7 @@ namespace cv {
 namespace warp {
 
 Warper::Warper(int index, int image_count)
-    :inputWidth(inFmt.fmt.pix.width),
-    inputHeight(inFmt.fmt.pix.height),
-    inputFourcc(inFmt.fmt.pix.pixelformat),
-    inputSizeimage(inFmt.fmt.pix.sizeimage),
-    outputWidth(outFmt.fmt.pix.width),
-    outputHeight(outFmt.fmt.pix.height),
-    outputFourcc(outFmt.fmt.pix.pixelformat),
-    outputSizeimage(outFmt.fmt.pix.sizeimage),
-    buf_count(image_count), isStreaming(false)
+    :buf_count(image_count), isStreaming(false)
 {
     String deviceName = cv::format("/dev/video%d", index);
 
@@ -56,6 +48,7 @@ Warper::Warper(int index, int image_count)
     if (c_fd.querycap(vcap)) {
         CV_Error(CV_StsBadArg, "Error while querying capabilities" + deviceName);
     }
+
     setFormat(false, DEFAULT_WIDTH, DEFAULT_HEIGHT, DEFAULT_FOURCC);
     setFormat(true, DEFAULT_WIDTH, DEFAULT_HEIGHT, DEFAULT_FOURCC);
 
@@ -79,7 +72,7 @@ Warper::~Warper()
 int Warper::setFormat(bool isCapture, unsigned width, unsigned height, int fourcc)
 {
     struct v4l2_format &vfmt = isCapture ? outFmt: inFmt;
-    int type = isCapture ? V4L2_BUF_TYPE_VIDEO_CAPTURE : V4L2_BUF_TYPE_VIDEO_OUTPUT;
+    int type = isCapture ? V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE : V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE;
     int ret;
 
     CV_LOG_INFO(NULL, "Requested " \
@@ -93,19 +86,58 @@ int Warper::setFormat(bool isCapture, unsigned width, unsigned height, int fourc
     if (isStreaming)
         return 1;
 
-    vfmt.fmt.pix.width = width;
-    vfmt.fmt.pix.height = height;
-    vfmt.fmt.pix.pixelformat = fourcc;
+    vfmt.fmt.pix_mp.width = width;
+    vfmt.fmt.pix_mp.height = height;
+    vfmt.fmt.pix_mp.pixelformat = fourcc;
 
     ret = c_fd.s_fmt(vfmt, true);
 
     CV_LOG_INFO(NULL, "Got " \
         << (isCapture ? "Capture" : "Output") << " device:"\
-        << vfmt.fmt.pix.width << "x" << vfmt.fmt.pix.height \
-        << " " FOURCC_TO_STRING(vfmt.fmt.pix.pixelformat) \
-        << " Image size: " << vfmt.fmt.pix.sizeimage);
+        << vfmt.fmt.pix_mp.width << "x" << vfmt.fmt.pix_mp.height \
+        << " " FOURCC_TO_STRING(vfmt.fmt.pix_mp.pixelformat) \
+        << " Image size: " << vfmt.fmt.pix_mp.plane_fmt[0].sizeimage);
 
     return ret;
+}
+unsigned int Warper::getInputWidth()
+{
+    return inFmt.fmt.pix_mp.width;
+}
+
+unsigned int Warper::getInputHeight()
+{
+    return inFmt.fmt.pix_mp.height;
+}
+
+unsigned int Warper::getInputFourcc()
+{
+    return inFmt.fmt.pix_mp.pixelformat;
+}
+
+unsigned int Warper::getInputSizeimage()
+{
+    return inFmt.fmt.pix_mp.plane_fmt[0].sizeimage;
+}
+
+unsigned int Warper::getOutputWidth()
+{
+    return outFmt.fmt.pix_mp.width;
+}
+
+unsigned int Warper::getOutputHeight()
+{
+    return outFmt.fmt.pix_mp.height;
+}
+
+unsigned int Warper::getOutputFourcc()
+{
+    return outFmt.fmt.pix_mp.pixelformat;
+}
+
+unsigned int Warper::getOutputSizeimage()
+{
+    return outFmt.fmt.pix_mp.plane_fmt[0].sizeimage;
 }
 
 int Warper::setInputFormat(unsigned width, unsigned height, int fourcc)
@@ -202,23 +234,36 @@ int Warper::write(InputArrayOfArrays images)
 
     CV_Assert(nimages <= qout.g_buffers());
 
+    CV_LOG_INFO(NULL, "Writing...");
     for (unsigned i = 0; i < nimages; i++) {
         cv4l_buffer buf(qout);
         Mat image = images.getMat(i);
         unsigned imagesz = image.total() * image.elemSize();
-            if (c_fd.querybuf(buf, i)) {
+        unsigned read = 0;
+        if (c_fd.querybuf(buf, i)) {
             CV_LOG_ERROR(NULL, "Error " << errno << " while querying output buffer");
             return 1;
         }
 
         buf.update(qout, i);
-        buf.s_bytesused(buf.g_length(0));
-        void *pbuf = qout.g_dataptr(buf.g_index(), 0);
-        unsigned buf_len = qout.g_length(0);
+        buf.s_field(V4L2_FIELD_NONE);
 
-        CV_Assert(imagesz == buf_len);
+        for (unsigned j = 0; j < qout.g_num_planes(); j++) {
+            unsigned char *pbuf =
+                static_cast<unsigned char *>(qout.g_dataptr(buf.g_index(), j));
+            unsigned buf_len = qout.g_length(j);
+            void *image_ptr = image.ptr() + read;
+            pbuf += read;
 
-        memcpy(pbuf, image.ptr(), buf_len);
+            CV_LOG_INFO(NULL, "Writing "
+                    << buf_len << " bytes"
+                    << " from " << image_ptr
+                    << " to " << pbuf);
+            memcpy(pbuf, image_ptr, buf_len);
+            read += buf_len;
+            buf.s_bytesused(buf_len);
+        }
+        CV_Assert(imagesz == read);
 
         buf.s_timestamp_clock();
 
@@ -252,8 +297,10 @@ int Warper::read(OutputArrayOfArrays images)
     for (unsigned i = 0; i < nimages; i++) {
         cv4l_buffer buf(qin);
         cv4l_buffer bufOut(qout);
+
         Mat image = images.getMat(i);
         unsigned imagesz = image.total() * image.elemSize();
+        unsigned written = 0;
 
         if (rd_fds) {
             FD_ZERO(rd_fds);
@@ -296,18 +343,23 @@ int Warper::read(OutputArrayOfArrays images)
             return 1;
         }
 
-
         CV_LOG_INFO(NULL, "Reading from " << buf.g_index());
-        unsigned char *pbuf = static_cast<unsigned char *>(qin.g_dataptr(buf.g_index(), 0));
-        unsigned used = buf.g_bytesused(0);
-        unsigned offset = buf.g_data_offset(0);
-        used -= offset;
-        pbuf += offset;
+        for (unsigned j = 0; j < qin.g_num_planes(); j++) {
+            unsigned used = buf.g_bytesused(j);
+            unsigned offset = buf.g_data_offset(j);
+            unsigned char *pbuf =
+                static_cast<unsigned char *>(qin.g_dataptr(buf.g_index(), j));
+            void *image_ptr = image.ptr() + written;
+            used -= offset;
+            pbuf += offset;
 
-        CV_Assert(imagesz == used);
-        sprintf(msg, " Writing image from %p to %p", pbuf, image.ptr());
-        CV_LOG_INFO(NULL, msg);
-        memcpy(image.ptr(), pbuf, used);
+            sprintf(msg, " Writing image from %p to %p", pbuf, image_ptr);
+            CV_LOG_INFO(NULL, msg);
+            memcpy(image_ptr, pbuf, used);
+            written += used;
+        }
+
+        CV_Assert(imagesz == written);
 
         if (c_fd.qbuf(buf)) {
             CV_LOG_ERROR(NULL, "Error " << errno << " while queuing input buffer");
@@ -389,15 +441,15 @@ void Warper::warp(InputArrayOfArrays inputImages, OutputArrayOfArrays outputImag
     }
     CV_LOG_INFO(NULL, "Input dims: " << inputImages.dims() \
         << " channels: " << inputImages.channels() \
-        << " ImageSize: " << inputSizeimage \
+        << " ImageSize: " << getInputSizeimage() \
         << " cols: " << inputImages.cols() \
         << " rows: " << inputImages.rows());
 
     //TODO: Handle scaling
-    outputImages.create(inputImages.rows(), outputSizeimage, inputImages.type());
+    outputImages.create(inputImages.rows(), getOutputSizeimage(), inputImages.type());
     CV_LOG_INFO(NULL, "Output dims: " << outputImages.dims() \
         << " channels: " << outputImages.channels() \
-        << " ImageSize: " << outputSizeimage \
+        << " ImageSize: " << getOutputSizeimage() \
         << " cols: " << outputImages.cols() \
         << " rows: " << outputImages.rows());
 

@@ -82,14 +82,16 @@ public:
      * @brief Stop streaming operations
      */
     CV_WRAP int stop_streaming();
-    CV_PROP const unsigned& inputWidth;
-    CV_PROP const unsigned& inputHeight;
-    CV_PROP const unsigned& inputFourcc;
-    CV_PROP const unsigned& inputSizeimage;
-    CV_PROP const unsigned& outputWidth;
-    CV_PROP const unsigned& outputHeight;
-    CV_PROP const unsigned& outputFourcc;
-    CV_PROP const unsigned& outputSizeimage;
+
+    CV_WRAP unsigned getInputWidth();
+    CV_WRAP unsigned getInputHeight();
+    CV_WRAP unsigned getInputFourcc();
+    CV_WRAP unsigned getInputSizeimage();
+    CV_WRAP unsigned getOutputWidth();
+    CV_WRAP unsigned getOutputHeight();
+    CV_WRAP unsigned getOutputFourcc();
+    CV_WRAP unsigned getOutputSizeimage();
+
 private:
     int setFormat(bool isCapture, unsigned width, unsigned height, int fourcc);
     int write(InputArrayOfArrays images);
@@ -111,6 +113,7 @@ private:
 #define DEFAULT_WIDTH 640
 #define DEFAULT_HEIGHT 480
 #define DEFAULT_FOURCC V4L2_PIX_FMT_YUYV
+#define DEFAULT_SZ_IMAGE 614400 //640*480*2
 
 //! @}
 }
