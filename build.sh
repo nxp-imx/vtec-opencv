@@ -197,6 +197,7 @@ do_configure () {
     rm -Rf "${BUILD_DIR}"
     mkdir -p "${BUILD_DIR}"
     cd "${BUILD_DIR}" || fatal "Can chdir to ${BUILD_DIR}"
+    PYTHON3_NUMPY_INCLUDE_DIRS=$(find "${SDKTARGETSYSROOT}" -type d  -path '*/site-packages/numpy/core/include')
     cmake \
             -GNinja \
             -DENABLE_CCACHE=ON \
@@ -210,7 +211,7 @@ do_configure () {
             -DINSTALL_PYTHON_EXAMPLES=ON \
             -DINSTALL_TESTS=ON \
             -DPYTHON3_EXECUTABLE="${OECORE_NATIVE_SYSROOT}/usr/bin/python3" \
-            -DPYTHON3_NUMPY_INCLUDE_DIRS:PATH="${SDKTARGETSYSROOT}/usr/lib/python3.9/site-packages/numpy/core/include" \
+            -DPYTHON3_NUMPY_INCLUDE_DIRS:PATH="${PYTHON3_NUMPY_INCLUDE_DIRS}" \
             -DBUILD_opencv_python3=ON \
             -DBUILD_OPENJPEG=ON \
             -DWITH_TBB=ON \
