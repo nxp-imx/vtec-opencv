@@ -139,10 +139,10 @@ sudomize()
 source_SDK () {
     [ -d "${SDK_DIR}" ] || fatal "SDK folder does not exist"
     unset LD_LIBRARY_PATH
-    ENV_SETUP_SCRIPT=$(find ${SDK_DIR} -type f -name environment-setup* 2> /dev/null)
+    ENV_SETUP_SCRIPT=$(find "${SDK_DIR}" -type f -name "environment-setup*" 2> /dev/null)
     if [ -n "${ENV_SETUP_SCRIPT}" ];
     then
-        # shellcheck disable=SC1091
+        # shellcheck disable=SC1091,SC1090
         . "${ENV_SETUP_SCRIPT}"
         # shellcheck disable=SC2181
         if [ $? != 0 ];then
@@ -153,8 +153,8 @@ source_SDK () {
             echo "Buildroot toolchain detected"
             SDKTARGETSYSROOT=$(find "${SDK_DIR}" -type d -name sysroot)
             OECORE_NATIVE_SYSROOT=${SDK_DIR}
-            [ -n ${SDKTARGETSYSROOT} ] || fatal "Buildroot SDK target sysroot not found"
-            [ -n ${OECORE_NATIVE_SYSROOT} ] || fatal "Buildroot SDK native sysroot not found"
+            [ -n "${SDKTARGETSYSROOT}" ] || fatal "Buildroot SDK target sysroot not found"
+            [ -n "${OECORE_NATIVE_SYSROOT}" ] || fatal "Buildroot SDK native sysroot not found"
 
             EXTRA_OPTS="-DCMAKE_TOOLCHAIN_FILE=${OECORE_NATIVE_SYSROOT}/share/buildroot/toolchainfile.cmake"
         else
@@ -219,7 +219,7 @@ do_configure () {
             -DWITH_OPENGL=ON \
             -DWITH_JPEG=ON \
             -DWITH_OPENCL=ON \
-            ${EXTRA_OPTS} \
+            "${EXTRA_OPTS}" \
             "${CORE_DIR}"
 }
 
@@ -235,17 +235,17 @@ do_install() {
         fatal "Can not execute install without a valid rootfs directory."
     fi
 
-    sudomize ${ROOTFS_DIR} rm -Rf \
+    sudomize "${ROOTFS_DIR}" rm -Rf \
         "${ROOTFS_DIR}/usr/lib/libopencv_*" \
         "${ROOTFS_DIR}/usr/lib/python3.9/site-packages/cv2"
 
-    sudomize ${ROOTFS_DIR} rsync -arz "${BUILD_DIR}/install/" "${ROOTFS_DIR}/usr/"
-    sudomize ${ROOTFS_DIR} rsync -arz "${BUILD_DIR}/install/" "${SDKTARGETSYSROOT}/usr/"
+    sudomize "${ROOTFS_DIR}" rsync -arz "${BUILD_DIR}/install/" "${ROOTFS_DIR}/usr/"
+    sudomize "${ROOTFS_DIR}" rsync -arz "${BUILD_DIR}/install/" "${SDKTARGETSYSROOT}/usr/"
 
     cd "${ROOTFS_DIR}/usr/lib/python3.9/site-packages/cv2/python-3.9" || fatal "cv2 python library folder does not exist"
     if [ -e cv2.cpython-39-x86_64-linux-gnu.so ];
     then
-        sudomize $(pwd) mv -f cv2.cpython-39-x86_64-linux-gnu.so cv2.so
+        sudomize "$(pwd)" mv -f cv2.cpython-39-x86_64-linux-gnu.so cv2.so
     fi
 }
 
