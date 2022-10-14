@@ -235,17 +235,25 @@ do_install() {
         fatal "Can not execute install without a valid rootfs directory."
     fi
 
+    local rootfs_site_packages_cv2
+    local rootfs_site_packages_cv2_lib
+    local rootfs_site_packages_cv2_lib_name
+
+    rootfs_site_packages_cv2=$(find "${ROOTFS_DIR}" -type d -path '*/python3.*/site-packages/cv2')
     sudomize "${ROOTFS_DIR}" rm -Rf \
         "${ROOTFS_DIR}/usr/lib/libopencv_*" \
-        "${ROOTFS_DIR}/usr/lib/python3.9/site-packages/cv2"
+        "${rootfs_site_packages_cv2}"
 
     sudomize "${ROOTFS_DIR}" rsync -arz "${BUILD_DIR}/install/" "${ROOTFS_DIR}/usr/"
     sudomize "${ROOTFS_DIR}" rsync -arz "${BUILD_DIR}/install/" "${SDKTARGETSYSROOT}/usr/"
 
-    cd "${ROOTFS_DIR}/usr/lib/python3.9/site-packages/cv2/python-3.9" || fatal "cv2 python library folder does not exist"
-    if [ -e cv2.cpython-39-x86_64-linux-gnu.so ];
+    rootfs_site_packages_cv2_lib=$(find "${rootfs_site_packages_cv2}" -type f -iname 'cv2.*.so')
+    rootfs_site_packages_cv2_lib_name=$(basename "${rootfs_site_packages_cv2_lib}")
+
+    cd "$(dirname "${rootfs_site_packages_cv2_lib}")" || fatal "cv2 python library folder does not exist"
+    if [ -e "${rootfs_site_packages_cv2_lib_name}" ];
     then
-        sudomize "$(pwd)" mv -f cv2.cpython-39-x86_64-linux-gnu.so cv2.so
+        sudomize "$(pwd)" mv -f  "${rootfs_site_packages_cv2_lib_name}" cv2.so
     fi
 }
 
