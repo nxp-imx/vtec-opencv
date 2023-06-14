@@ -21,8 +21,12 @@ BUILD_DIR=${ROOT_DIR}/build
 CORE_DIR=${ROOT_DIR}/core
 EXTRA_DIR=${ROOT_DIR}/extra
 CONTRIB_DIR=${ROOT_DIR}/contrib
+MODULES=${MODULES:-"dw100 imx2d"}
+VERBOSE=${VERBOSE:-"OFF"}
+TINY=${TINY:-"OFF"}
 
-TAG=4.5.5
+
+TAG=4.7.0
 ROOTFS_DIR=
 SDK_DIR=${SDK_DIR:-/opt/sdk}
 GIT_OPENCV_CORE=https://github.com/opencv/opencv.git
@@ -48,7 +52,7 @@ cat << EOF
             This help message
         -t, --tag TAG
             Specify the tag to checkout on opencv core (except vtec)
-            default: 4.5.5
+            default: 4.7.0
         -r, --rootfs ROOTFS
             specify the target rootfs directory where to install build artifacts
         -s, --sdk SDK_DIR
@@ -90,19 +94,19 @@ while true; do
             shift
             GIT_OPENCV_EXTRA=$1
             ;;
-        --sdk | s)
+        --sdk | -s)
             shift
             SDK_DIR=$1
             ;;
-        --tag | t)
+        --tag | -t)
             shift
             TAG=$1
             ;;
-        --rootfs | r)
+        --rootfs | -r)
             shift
             ROOTFS_DIR=$1
             ;;
-        --help | h)
+        --help | -h)
             do_usage
             exit 0
             ;;
@@ -123,7 +127,7 @@ fatal()
     exit 1
 }
 
-sudomize()
+sudo_eval()
 {
     destdir=$1
     shift
@@ -132,7 +136,7 @@ sudomize()
     then
         sudo "$@"
     else
-        exec "$@"
+        eval "$@"
     fi
 }
 
@@ -140,6 +144,7 @@ source_SDK () {
     [ -d "${SDK_DIR}" ] || fatal "SDK folder does not exist"
     unset LD_LIBRARY_PATH
     ENV_SETUP_SCRIPT=$(find "${SDK_DIR}" -type f -name "environment-setup*" 2> /dev/null)
+    QT_EXTRA_OPTS="-DWITH_QT=OFF"
     if [ -n "${ENV_SETUP_SCRIPT}" ];
     then
         # shellcheck disable=SC1091,SC1090
@@ -159,10 +164,30 @@ source_SDK () {
             EXTRA_OPTS="-DCMAKE_TOOLCHAIN_FILE=${OECORE_NATIVE_SYSROOT}/share/buildroot/toolchainfile.cmake"
         else
             echo "Poky toolchain detected"
+            EXTRA_OPTS="-DCMAKE_TOOLCHAIN_FILE=${OECORE_NATIVE_SYSROOT}/usr/share/cmake/armv8a-poky-linux-toolchain.cmake"
+            if [ -n $(find "$SDKTARGETSYSROOT/usr/lib/cmake" -type d -regex '.*lib/cmake/Qt[0-9]+') ];
+            then
+                QT_EXTRA_OPTS="-DWITH_QT=ON"
+                QT_EXTRA_OPTS+=" -DQT_HOST_PATH=${OECORE_NATIVE_SYSROOT}/usr"
+
+                # XXX: explicit Qt6 components config files locations should not be needed!
+                # QT_EXTRA_OPTS+=" -DCMAKE_FIND_DEBUG_MODE=TRUE"
+                # QT_EXTRA_OPTS+=" -DQT_DEBUG_FIND_PACKAGE=ON"
+                # QT_EXTRA_OPTS+=" --debug-find-pkg=Qt6Core"
+                # QT_EXTRA_OPTS+=" --trace-expand"
+                QT_EXTRA_OPTS+=" -DQt6Core_DIR=$SDKTARGETSYSROOT/usr/lib/cmake/Qt6Core"
+                QT_EXTRA_OPTS+=" -DQt6Gui_DIR=$SDKTARGETSYSROOT/usr/lib/cmake/Qt6Gui"
+                QT_EXTRA_OPTS+=" -DQt6DBus_DIR=$SDKTARGETSYSROOT/usr/lib/cmake/Qt6DBus"
+                QT_EXTRA_OPTS+=" -DQt6Widgets_DIR=$SDKTARGETSYSROOT/usr/lib/cmake/Qt6Widgets"
+                QT_EXTRA_OPTS+=" -DQt6Test_DIR=$SDKTARGETSYSROOT/usr/lib/cmake/Qt6Test"
+                QT_EXTRA_OPTS+=" -DQt6Concurrent_DIR=$SDKTARGETSYSROOT/usr/lib/cmake/Qt6Concurrent"
+            fi
         fi
     else
         fatal "SDK environment setup file not found !"
     fi
+
+    EXTRA_OPTS+=" ${QT_EXTRA_OPTS}"
 }
 
 do_clone () {
@@ -198,6 +223,30 @@ do_configure () {
     mkdir -p "${BUILD_DIR}"
     cd "${BUILD_DIR}" || fatal "Can chdir to ${BUILD_DIR}"
     PYTHON3_NUMPY_INCLUDE_DIRS=$(find "${SDKTARGETSYSROOT}" -type d  -path '*/site-packages/numpy/core/include')
+    if [[ "$MODULES" =~ "dw100" ]];
+    then
+        EXTRA_OPTS+=" -DWITH_DW100=ON"
+    fi
+    if [[ "$MODULES" =~ "imx2d" ]];
+    then
+        EXTRA_OPTS+=" -DWITH_IMX2D=ON"
+        EXTRA_OPTS+=" -DOpenCV_HAL=Imx2dHal"
+        EXTRA_OPTS+=" -DImx2dHal_DIR=${VTEC_DIR}/modules/imx2d/cmake"
+    fi
+    if [[ "$VERBOSE" != "OFF" ]];
+    then
+        EXTRA_OPTS+=" -DCMAKE_VERBOSE_MAKEFILE=ON"
+    fi
+    if [[ "$TINY" != "OFF" ]];
+    then
+        EXTRA_OPTS+=" -DBUILD_LIST=core;ts;imgproc;python3;highgui;warp;imx2d"
+    fi
+    # option below emits '--rpath-link' ld flag that helps with link to shared lib having private linking
+    EXTRA_OPTS+=" -DCMAKE_SKIP_RPATH=ON"
+    # space character is needed before final command line argument
+    EXTRA_OPTS+=" "
+    set -x
+    # shellcheck disable=SC2086
     cmake \
             -GNinja \
             -DENABLE_CCACHE=ON \
@@ -207,26 +256,32 @@ do_configure () {
             -DKERNEL_HEADER_INCLUDE_DIR:PATH="${SDKTARGETSYSROOT}/usr/src/kernels/include" \
             -DOPENCV_EXTRA_MODULES_PATH="${CONTRIB_DIR}/modules;${VTEC_DIR}/modules" \
             -DOPENCV_TEST_DATA_PATH="${EXTRA_DIR}/testdata" \
+            -DINSTALL_BIN_EXAMPLES=ON \
             -DINSTALL_C_EXAMPLES=ON \
             -DINSTALL_PYTHON_EXAMPLES=ON \
             -DINSTALL_TESTS=ON \
             -DPYTHON3_EXECUTABLE="${OECORE_NATIVE_SYSROOT}/usr/bin/python3" \
             -DPYTHON3_NUMPY_INCLUDE_DIRS:PATH="${PYTHON3_NUMPY_INCLUDE_DIRS}" \
+            -DBUILD_EXAMPLES=ON \
             -DBUILD_opencv_python3=ON \
             -DBUILD_OPENJPEG=ON \
             -DWITH_TBB=ON \
-            -DWITH_QT=OFF \
             -DWITH_OPENGL=ON \
             -DWITH_JPEG=ON \
             -DWITH_OPENCL=ON \
-            "${EXTRA_OPTS}" \
+            ${EXTRA_OPTS} \
             "${CORE_DIR}"
+    set +x
 }
 
 do_build() {
     source_SDK
-    ninja -C "${BUILD_DIR}" || fatal "OpenCV build error"
-    ninja -C "${BUILD_DIR}" install &> /dev/null
+    if [[ "$VERBOSE" != "OFF" ]];
+    then
+        NINJA_VERBOSE="-v"
+    fi
+    ninja ${NINJA_VERBOSE} -C "${BUILD_DIR}" || fatal "OpenCV build error"
+    ninja ${NINJA_VERBOSE} -C "${BUILD_DIR}" install &> /dev/null
 }
 
 do_install() {
@@ -239,21 +294,21 @@ do_install() {
     local rootfs_site_packages_cv2_lib
     local rootfs_site_packages_cv2_lib_name
 
-    rootfs_site_packages_cv2=$(find "${ROOTFS_DIR}" -type d -path '*/python3.*/site-packages/cv2')
-    sudomize "${ROOTFS_DIR}" rm -Rf \
+    rootfs_site_packages_cv2=$(find "${ROOTFS_DIR}" -type d -path '*/python3.*/site-packages/cv2' 2>/dev/null)
+    sudo_eval "${ROOTFS_DIR}" rm -Rf \
         "${ROOTFS_DIR}/usr/lib/libopencv_*" \
         "${rootfs_site_packages_cv2}"
 
-    sudomize "${ROOTFS_DIR}" rsync -arz "${BUILD_DIR}/install/" "${ROOTFS_DIR}/usr/"
-    sudomize "${ROOTFS_DIR}" rsync -arz "${BUILD_DIR}/install/" "${SDKTARGETSYSROOT}/usr/"
+    sudo_eval "${ROOTFS_DIR}" rsync -arz "${BUILD_DIR}/install/" "${ROOTFS_DIR}/usr/"
+    sudo_eval "${ROOTFS_DIR}" rsync -arz "${BUILD_DIR}/install/" "${SDKTARGETSYSROOT}/usr/"
 
-    rootfs_site_packages_cv2_lib=$(find "${rootfs_site_packages_cv2}" -type f -iname 'cv2.*.so')
+    rootfs_site_packages_cv2_lib=$(find "${rootfs_site_packages_cv2}" -type f -iname 'cv2.*.so' 2>/dev/null)
     rootfs_site_packages_cv2_lib_name=$(basename "${rootfs_site_packages_cv2_lib}")
 
     cd "$(dirname "${rootfs_site_packages_cv2_lib}")" || fatal "cv2 python library folder does not exist"
     if [ -e "${rootfs_site_packages_cv2_lib_name}" ];
     then
-        sudomize "$(pwd)" mv -f  "${rootfs_site_packages_cv2_lib_name}" cv2.so
+        sudo_eval "$(pwd)" mv -f "${rootfs_site_packages_cv2_lib_name}" cv2.so
     fi
 }
 
