@@ -17,7 +17,7 @@ foo@bar:vtec$ ./build.sh --help
             This help message
         -t, --tag TAG
             Specify the tag to checkout on opencv core (except vtec)
-            default: 4.5.5
+            default: 4.7.0
         -r, --rootfs ROOTFS
             specify the target rootfs directory where to install build artifacts
         -s, --sdk SDK_DIR
@@ -48,6 +48,22 @@ accessible on your host, you could start with:
 ```console
 foo@bar:vtec$ ./build.sh --sdk ${SDK_DIR} --rootfs {ROOTFS} all
 ```
+
+`build.sh` script behavior can also be amended with environment variables:
+```
+MODULES=[<space separated list of modules names>]
+```
+where modules names correspond to directories in [modules](modules)\
+Default: all modules are enabled
+```
+VERBOSE=[ON|OFF]
+```
+Configures build output verbosity\
+Default: OFF
+```
+TINY=[ON|OFF]
+```
+Restricts to the minimum the list of modules included in the build
 
 ### Exporting the linux kernel headers
 
