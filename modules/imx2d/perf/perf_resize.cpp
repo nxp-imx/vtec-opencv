@@ -20,9 +20,10 @@
 #endif
 
 #include "perf_precomp.hpp"
-#include "opencv2/core/utils/logger.hpp"
+#include <opencv2/core/utils/logger.hpp>
 
 #include "imx2d_common.hpp"
+
 namespace opencv_test {
 
 CV_ENUM(Inter_t, INTER_NEAREST, INTER_LINEAR, INTER_CUBIC, INTER_LANCZOS4);
@@ -71,6 +72,10 @@ PERF_TEST_P(MatInfo_Pair_MatBuffer, imx2dResizeMatrix,
     Size to = get<1>(sizes);
     int matBuffer = get<2>(GetParam());
     unsigned halCount;
+
+    // start with default state
+    setUseImx2d(false);
+    setUseGMatAllocator(false);
 
     bool useAllocator = (matBuffer != MATBUFFER_HEAP);
     bool cacheable = (matBuffer == MATBUFFER_G2D_CACHED);
@@ -125,6 +130,10 @@ PERF_TEST_P(MatInfo_Pair_MatBuffer, imx2dResizeSubmatrix,
     Size to = get<1>(sizes);
     int matBuffer = get<2>(GetParam());
     unsigned halCount;
+
+    // start with default state
+    setUseImx2d(false);
+    setUseGMatAllocator(false);
 
     bool useAllocator = (matBuffer != MATBUFFER_HEAP);
     bool cacheable = (matBuffer == MATBUFFER_G2D_CACHED);
@@ -187,6 +196,10 @@ PERF_TEST_P(MatInfo_Pair_MatBuffer, imx2dCopyHeapToMat,
     bool cacheable = (matBuffer == MATBUFFER_G2D_CACHED);
     int cn = CV_MAT_CN(matType);
 
+    // start with default state
+    setUseImx2d(false);
+    setUseGMatAllocator(false);
+
     void *psrc = malloc(from.height * from.width * cn);
     Mat src(from.height, from.width, matType, psrc, from.width * cn);
 
@@ -227,6 +240,10 @@ PERF_TEST_P(MatInfo_Pair_MatBuffer, imx2dCopyMatToHeap,
     bool useAllocator = (matBuffer != MATBUFFER_HEAP);
     bool cacheable = (matBuffer == MATBUFFER_G2D_CACHED);
     int cn = CV_MAT_CN(matType);
+
+    // start with default state
+    setUseImx2d(false);
+    setUseGMatAllocator(false);
 
     void *pdst = malloc(from.height * from.width * cn);
     Mat dst(from.height, from.width, matType, pdst, from.width * cn);
@@ -269,6 +286,10 @@ PERF_TEST_P(MatInfo_Pair_MatBuffer, imx2dMatPlusOne,
     bool cacheable = (matBuffer == MATBUFFER_G2D_CACHED);
     int cn = CV_MAT_CN(matType);
 
+    // start with default state
+    setUseImx2d(false);
+    setUseGMatAllocator(false);
+
     setGMatAllocatorParams(GMatAllocatorParams(0, cacheable));
     setUseGMatAllocator(useAllocator);
 
@@ -296,7 +317,6 @@ PERF_TEST_P(MatInfo_Pair_MatBuffer, imx2dMatPlusOne,
 
 #endif
 
-#ifdef IMX2D_PERF_CPU_BENCHMARK
 
 // Benchmark CPU time needed for 3 chans / 4 chans Mat conversions
 // this is to evaluate 3 channels support overhead for CPU-based CSC
@@ -318,6 +338,10 @@ PERF_TEST_P(MatInfo_Pair_MatBuffer, cpuCscBench,
     Size from = get<0>(sizes);
     Size to = get<1>(sizes);
     int matBuffer = get<2>(GetParam());
+
+    // start with default state
+    setUseImx2d(false);
+    setUseGMatAllocator(false);
 
     bool useAllocator = (matBuffer != MATBUFFER_HEAP);
     bool cacheable = (matBuffer == MATBUFFER_G2D_CACHED);
@@ -348,8 +372,6 @@ PERF_TEST_P(MatInfo_Pair_MatBuffer, cpuCscBench,
     SANITY_CHECK_NOTHING();
 }
 
-
-
 // Benchmarks execution of CPU based resize algorithms
 PERF_TEST_P(MatInfo_Pair_Inter, cpuResizeAllInterpolations,
             testing::Combine(
@@ -368,6 +390,7 @@ PERF_TEST_P(MatInfo_Pair_Inter, cpuResizeAllInterpolations,
     Size to = get<1>(sizes);
     int inter = get<2>(GetParam());
 
+    // start with default state
     setUseImx2d(false);
     setUseGMatAllocator(false);
 
@@ -382,8 +405,6 @@ PERF_TEST_P(MatInfo_Pair_Inter, cpuResizeAllInterpolations,
 
     SANITY_CHECK_NOTHING();
 }
-
-#endif // IMX2D_PERF_CPU_BENCHMARK
 
 
 #ifdef IMX2D_DUMP_PNG
@@ -400,6 +421,10 @@ PERF_TEST_P(MatInfo_Pair_Bool, imx2dResizeUpLena,
     Size from = get<0>(sizes);
     Size to = get<1>(sizes);
     bool imx2d = get<2>(GetParam());
+
+    // start with default state
+    setUseImx2d(false);
+    setUseGMatAllocator(false);
 
     setUseImx2d(imx2d)
     GMatAllocatorParams(GMatAllocatorParams(0, true));

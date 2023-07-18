@@ -46,3 +46,76 @@ inline int __imx2d_resize(int src_type, const uchar *src_data, size_t src_step, 
 }
 
 
+#undef  cv_hal_flip
+#define cv_hal_flip __imx2d_flip
+
+enum {
+    IMX2D_FLIP_NONE,
+    IMX2D_FLIP_HORIZONTAL,
+    IMX2D_FLIP_VERTICAL,
+    IMX2D_FLIP_BOTH,
+};
+
+int imx2d_flip(int src_type, const uchar* src_data, size_t src_step,
+               int src_width, int src_height,
+               uchar* dst_data, size_t dst_step, int flip_type);
+
+inline int __imx2d_flip(int src_type, const uchar* src_data, size_t src_step,
+                        int src_width, int src_height,
+                        uchar* dst_data, size_t dst_step, int flip_mode)
+{
+    int ret, flip_type;
+
+    if (flip_mode == 0)
+        flip_type = IMX2D_FLIP_VERTICAL;
+    else if (flip_mode > 0)
+        flip_type = IMX2D_FLIP_HORIZONTAL;
+    else
+        flip_type = IMX2D_FLIP_BOTH;
+
+    ret = imx2d_flip(src_type, src_data, src_step,
+                     src_width, src_height,
+                     dst_data, dst_step, flip_type);
+
+    return ret;
+}
+
+
+#undef cv_hal_rotate
+#define cv_hal_rotate __imx2d_rotate
+
+enum {
+    IMX2D_ROTATE_NONE,
+    IMX2D_ROTATE_90,
+    IMX2D_ROTATE_180,
+    IMX2D_ROTATE_270,
+};
+
+int imx2d_rotate(int src_type, const uchar* src_data, size_t src_step,
+                 int src_width, int src_height,
+                 uchar* dst_data, size_t dst_step, int rotate_type);
+
+inline int __imx2d_rotate(int src_type, const uchar* src_data, size_t src_step,
+                          int src_width, int src_height,
+                          uchar* dst_data, size_t dst_step, int angle)
+{
+    int ret, type;
+
+    if (angle == 90)
+        type = IMX2D_ROTATE_90;
+    else if (angle == 180)
+        type = IMX2D_ROTATE_180;
+    else if (angle == 270)
+        type = IMX2D_ROTATE_270;
+    else
+        type = IMX2D_ROTATE_NONE;
+
+    ret = imx2d_rotate(src_type, src_data, src_step,
+                       src_width, src_height,
+                       dst_data, dst_step, type);
+
+    return ret;
+}
+
+
+

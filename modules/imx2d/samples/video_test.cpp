@@ -26,6 +26,9 @@
 namespace {
 
 PF_ENTRY_PERIOD_MS(__resize, 1000);
+PF_ENTRY_PERIOD_MS(__flip, 1000);
+PF_ENTRY_PERIOD_MS(__rotate, 1000);
+
 
 const std::string about =
         "Camera capture and accelerated video resize\n";
@@ -35,11 +38,13 @@ const std::string keys  =
         "{cstr           | <none> | video capture string }"
         "{cv4l2          |        | V4L2 videocapture API }"
         "{cgst           |        | GStreamer videocapture API }"
+        "{flip           | 0      | flip mode 0:none 1:horizontal 2:vertical 3:both }"
         "{ifps           | 30     | input video FPS }"
         "{iw             | 640    | input video width }"
         "{ih             | 480    | input video height }"
-        "{ow             | 1920   | output video width }"
-        "{oh             | 1080   | output video height }"
+        "{ow             | -1     | output video width (negative means no width resize) }"
+        "{oh             | -1     | output video height (negative means no height resize) }"
+        "{rotate         | 0      | rotate mode (degrees clockwise) 0:none 1:90 2:180 3:270 }"
         "{imx2d          | true   | i.MX 2D acceleration }"
         "{alloc          | true   | i.MX 2D custom allocator enabled }"
         ;
@@ -54,15 +59,17 @@ int main(int argc, char *argv[]) {
         exit(0);
     }
 
-    unsigned int captureIndex = parser.get<unsigned int>("cid");
+    int captureIndex = parser.get<unsigned int>("cid");
     std::string captureStr = parser.get<std::string>("cstr");
     bool v4l2Api = parser.has("cv4l2");
     bool gstApi = parser.has("cgst");
-    unsigned int videoInfps = parser.get<unsigned int>("ifps");
-    unsigned int videoInWidth = parser.get<unsigned int>("iw");
-    unsigned int videoInHeight = parser.get<unsigned int>("ih");
-    unsigned int videoOutWidth = parser.get<unsigned int>("ow");
-    unsigned int videoOutHeight = parser.get<unsigned int>("oh");
+    int videoInfps = parser.get<int>("ifps");
+    int videoInWidth = parser.get<int>("iw");
+    int videoInHeight = parser.get<int>("ih");
+    int videoOutWidth = parser.get<int>("ow");
+    int videoOutHeight = parser.get<int>("oh");
+    int flipMode = parser.get<int>("flip");
+    int rotateMode = parser.get<int>("rotate");
 
     std::cout
         << " captureIndex:" << captureIndex
@@ -115,7 +122,36 @@ int main(int argc, char *argv[]) {
     cap.set(cv::CAP_PROP_FRAME_HEIGHT, videoInHeight);
     cap.set(cv::CAP_PROP_FPS, videoInfps);
 
-    cv::Mat src, dst;
+    bool resize = false;
+    if ((videoOutWidth >= 0) || (videoOutHeight >= 0))
+        resize = true;
+    if (videoOutWidth < 0)
+        videoOutWidth = videoInWidth;
+    if (videoOutHeight < 0)
+        videoOutHeight = videoInHeight;
+    cv::Size dstSize(videoOutWidth, videoOutHeight);
+
+    int flipCode = 0;
+    if (flipMode) {
+        if (flipMode == 1)
+            flipCode = 1;
+        else if (flipMode == 2)
+            flipCode = 0;
+        else if (flipMode == 3)
+            flipCode = -1;
+    }
+
+    int rotateCode = 0;
+    if (rotateMode) {
+        if (rotateMode == 1)
+            rotateCode = cv::ROTATE_90_CLOCKWISE;
+        else if (rotateMode == 2)
+            rotateCode = cv::ROTATE_180;
+        else if (rotateMode == 3)
+            rotateCode = cv::ROTATE_90_COUNTERCLOCKWISE;
+    }
+
+    cv::Mat src, dstRsz, dstFlip, dstRot;
     while (true) {
         cap >> src;
         if (src.empty()) {
@@ -124,13 +160,31 @@ int main(int argc, char *argv[]) {
             continue;
         }
 
-        cv::Size dstSize(videoOutWidth, videoOutHeight);
+        if (flipMode) {
+            PF_ENTER(__flip);
+            cv::flip(src, dstFlip, flipCode);
+            PF_EXIT(__flip);
+        } else {
+            dstFlip = src;
+        }
 
-        PF_ENTER(__resize);
-        cv::resize(src, dst, dstSize, 0, 0, cv::INTER_LINEAR);
-        PF_EXIT(__resize);
+        if (rotateMode) {
+            PF_ENTER(__rotate);
+            cv::rotate(dstFlip, dstRot, rotateCode);
+            PF_EXIT(__rotate);
+        } else {
+            dstRot = dstFlip;
+        }
 
-        cv::imshow(windowName, dst);
+        if (resize) {
+            PF_ENTER(__resize);
+            cv::resize(dstRot, dstRsz, dstSize, 0, 0, cv::INTER_LINEAR);
+            PF_EXIT(__resize);
+        } else {
+            dstRsz = dstRot;
+        }
+
+        cv::imshow(windowName, dstRsz);
 
         int c = cv::pollKey();
         if (c == 27)

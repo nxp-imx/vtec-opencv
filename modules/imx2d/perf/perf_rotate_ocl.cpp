@@ -24,39 +24,33 @@
 namespace opencv_test {
 namespace ocl {
 
-CV_ENUM(Inter, INTER_NEAREST, INTER_LINEAR, INTER_CUBIC, INTER_LANCZOS4);
+CV_ENUM(Rotate_t, ROTATE_90_CLOCKWISE, ROTATE_180, ROTATE_90_COUNTERCLOCKWISE);
 
-typedef tuple<Size,Size> Size_Size_t;
-typedef tuple<MatType, Size_Size_t, Inter> MatInfo_Pair_Inter_t;
-typedef TestBaseWithParam<MatInfo_Pair_Inter_t> MatInfo_Pair_Inter;
+typedef tuple<MatType, Size, Rotate_t> MatInfo_Size_Rotate_t;
+typedef TestBaseWithParam<MatInfo_Size_Rotate_t> MatInfo_Size_Rotate;
 
 #ifdef IMX2D_PERF_OCL_BENCHMARK
-// Benchmarks execution of OCL based resize algorithms
-OCL_PERF_TEST_P(MatInfo_Pair_Inter, oclResizeAllInterpolations,
+// Benchmarks execution of OCL based rotate algorithms
+OCL_PERF_TEST_P(MatInfo_Size_Rotate, oclRotateAllModes,
                 testing::Combine(
                     testing::Values(CV_8UC3, CV_8UC4),
-                    testing::Values(Size_Size_t(szVGA, sz1080p),
-                                    Size_Size_t(sz1080p, sz2160p),
-                                    Size_Size_t(sz1080p, szVGA),
-                                    Size_Size_t(szVGA, cv::Size(200, 200))),
-                    Inter::all()
+                    testing::Values(cv::Size(200, 200), szVGA, sz1080p, sz2160p),
+                    Rotate_t::all()
                     )
                 )
 {
     int matType = get<0>(GetParam());
-    Size_Size_t sizes = get<1>(GetParam());
-    Size from = get<0>(sizes);
-    Size to = get<1>(sizes);
-    int inter = get<2>(GetParam());
+    Size size = get<1>(GetParam());
+    int rotateCode = get<2>(GetParam());
 
-    Mat src(from, matType);
+    Mat src(size, matType);
     cvtest::fillGradient(src);
     UMat usrc = src.getUMat(ACCESS_WRITE);
-    UMat udst(to, matType);
+    UMat udst(size, matType);
 
     OCL_TEST_CYCLE_N(10)
     {
-        resize(usrc, udst, to, 0, 0, inter);
+        rotate(usrc, udst, rotateCode);
     }
 
     SANITY_CHECK_NOTHING();

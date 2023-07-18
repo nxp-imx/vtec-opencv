@@ -23,14 +23,13 @@
 #include <unistd.h>
 #include <vector>
 
+#define DEBUG
 #include "imx2d_common.hpp"
 
 #include "g2d.h"
 
 namespace cv {
 namespace imx2d {
-
-//#define DEBUG
 
 #define __TO_STRING(m) #m
 #define TO_STRING(m) __TO_STRING(m)
@@ -43,7 +42,7 @@ namespace imx2d {
                               } while (0)
 
 #ifdef DEBUG
-#define CACHE_LOG(fmt, ...) printf(fmt "\n", ##__VA_ARGS__)
+#define CACHE_LOG(fmt, ...) IMX2D_INFO(fmt, ##__VA_ARGS__)
 #else
 #define CACHE_LOG(fmt, ...)
 #endif
@@ -257,7 +256,7 @@ protected:
     std::mutex mutex;
     std::vector<struct g2d_buf*> cacheVector;
 
-    static const size_t USAGE_MAX_DEFAULT = (32 * 1024 *1024);
+    static const size_t USAGE_MAX_DEFAULT = (64 * 1024 *1024);
     static const unsigned ALLOC_COUNT_MAX_DEFAULT = 16;
 };
 
@@ -337,9 +336,8 @@ struct g2d_buf* G2dBufPoolInstance::alloc(size_t size)
     IMX2D_Assert(cacheAllocCount == cacheVector.size());
     IMX2D_Assert(cacheUsage < cacheUsageMax);
     IMX2D_Assert(cacheAllocCount < cacheAllocCountMax );
-
-    CACHE_LOG("%s(%d) sz:%zu(%d) u:%zu c:%d (cached)",
-              __func__, cacheable, size, buf->buf_size,
+    CACHE_LOG("%s(%d) sz:%zu(%d) va:%p u:%zu c:%d (cached)",
+              __func__, cacheable, size, buf->buf_size, buf->buf_vaddr,
               cacheUsage, cacheAllocCount);
 
     return buf;
@@ -349,12 +347,15 @@ alloc_buff:
 
     buf = g2d_alloc(size, cacheable);
 
-    int bufSize = buf ? buf->buf_size : 0;
-    (void)bufSize;
-    CACHE_LOG("%s(%d) sz:%zu(%d) u:%zu c:%d (alloc-ed)",
-              __func__, cacheable, size, bufSize,
-              cacheUsage, cacheAllocCount);
-
+    if (buf) {
+        CACHE_LOG("%s(%d) sz:%zu(%d) va:%p u:%zu c:%d (alloc-ed)",
+                  __func__, cacheable, size, buf->buf_size, buf->buf_vaddr,
+                  cacheUsage, cacheAllocCount);
+    }
+    else
+    {
+        IMX2D_ERROR("%s g2d allocation failed (%zu)", __func__, size);
+    }
     return buf;
 }
 
@@ -403,15 +404,17 @@ void G2dBufPoolInstance::free(struct g2d_buf* buf)
     IMX2D_Assert(cacheUsage <= cacheUsageMax);
     IMX2D_Assert(cacheAllocCount <= cacheAllocCountMax );
 
-    CACHE_LOG("%s(%d) sz:%d u:%zu c:%d (cached)",
-              __func__, cacheable, buf->buf_size, cacheUsage, cacheAllocCount);
+    CACHE_LOG("%s(%d) sz:%d va:%p u:%zu c:%d (cached)",
+              __func__, cacheable, buf->buf_size, buf->buf_vaddr,
+              cacheUsage, cacheAllocCount);
 
     return;
 
 free_buf:
     lock.unlock();
-    CACHE_LOG("%s(%d) sz:%d u:%zu c:%d (freed)",
-              __func__, cacheable, buf->buf_size, cacheUsage, cacheAllocCount);
+    CACHE_LOG("%s(%d) sz:%d va:%p u:%zu c:%d (freed)",
+              __func__, cacheable, buf->buf_size, buf->buf_vaddr,
+              cacheUsage, cacheAllocCount);
 
     ret = g2d_free(buf);
     IMX2D_Assert(ret == 0);
@@ -678,10 +681,10 @@ unsigned int Imx2dHalCounters::readCount(Imx2dHalCounters::Primitive primitive)
 }
 
 
-//================================= Imx2dHal ====================================
+//================================= HardwareCapabilities ====================================
 
-Imx2dHal::HardwareFeatures::HardwareFeatures(): valid(false),
-                                                threeChannels(false)
+HardwareCapabilities::HardwareCapabilities(): supported(false),
+                                              caps()
 {
     const char *SYS_DEVICE_SOC_ID_FILE_PATH = "/sys/devices/soc0/soc_id";
 
@@ -710,14 +713,27 @@ Imx2dHal::HardwareFeatures::HardwareFeatures(): valid(false),
         std::cerr << "SoC not supported [" << soc << "]" << std::endl;
         return;
     }
-    valid = true;
+    supported = true;
 
     // 3 channels support on DPU
     std::vector<std::string> threeChans = {"i.MX8QM", "i.MX8QXP"};
     support = (std::find(threeChans.begin(), threeChans.end(), soc) !=
                    threeChans.end());
-    threeChannels = support;
+    caps[THREE_CHANNELS] = support;
 }
+
+bool HardwareCapabilities::hasSupport()
+{
+    return supported;
+}
+
+bool HardwareCapabilities::hasCapability(Capabilities cap)
+{
+    return caps[cap];
+}
+
+
+//================================= Imx2dHal ====================================
 
 Imx2dHal::Imx2dHal(): enabled(false), g2dHandle(nullptr) {}
 
@@ -736,7 +752,7 @@ void Imx2dHal::setEnable(bool flag)
 
     if (flag)
     {
-        IMX2D_Assert(hwFeatures.valid);
+        IMX2D_Assert(hwCapabilities.hasSupport());
 
         ret = g2d_open(&g2dHandle);
         IMX2D_Assert(ret == 0);
@@ -758,9 +774,9 @@ bool Imx2dHal::isEnabled()
     return enabled;
 }
 
-Imx2dHal::HardwareFeatures& Imx2dHal::getHardwareFeatures()
+HardwareCapabilities& Imx2dHal::getHardwareCapabilities()
 {
-    return hwFeatures;
+    return hwCapabilities;
 }
 
 void* Imx2dHal::getG2dHandle()

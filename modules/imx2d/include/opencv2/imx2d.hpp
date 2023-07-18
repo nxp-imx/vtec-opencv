@@ -96,7 +96,7 @@ Those parameters are used to configure the deallocated buffers cache.
 @param cacheAllocCountMax Maximum number of buffers in the cache.
 */
 
-static const size_t BUFFER_CACHE_PARAMS_USAGE_MAX_DEFAULT = (32 * 1024 *1024);
+static const size_t BUFFER_CACHE_PARAMS_USAGE_MAX_DEFAULT = (64 * 1024 *1024);
 static const unsigned BUFFER_CACHE_PARAMS_ALLOC_COUNT_MAX_DEFAULT = 16;
 
 class CV_EXPORTS_W_SIMPLE BufferCacheParams

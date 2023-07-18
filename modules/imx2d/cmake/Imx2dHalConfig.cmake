@@ -1,5 +1,3 @@
-set(IMX2D_DIR "${CMAKE_CURRENT_LIST_DIR}/..")
-
 get_filename_component(IMX2D_DIR "${CMAKE_CURRENT_LIST_DIR}/.." ABSOLUTE)
 
 # Variables expected by top level CMakeLists.txt

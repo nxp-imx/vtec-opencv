@@ -24,43 +24,47 @@
 namespace opencv_test {
 namespace ocl {
 
-CV_ENUM(Inter, INTER_NEAREST, INTER_LINEAR, INTER_CUBIC, INTER_LANCZOS4);
+enum {FLIP_HORIZONTAL, FLIP_VERTICAL, FLIP_BOTH};
+CV_ENUM(Flip_t, FLIP_HORIZONTAL, FLIP_VERTICAL, FLIP_BOTH);
 
-typedef tuple<Size,Size> Size_Size_t;
-typedef tuple<MatType, Size_Size_t, Inter> MatInfo_Pair_Inter_t;
-typedef TestBaseWithParam<MatInfo_Pair_Inter_t> MatInfo_Pair_Inter;
+typedef tuple<MatType, Size, Flip_t> MatInfo_Size_Flip_t;
+typedef TestBaseWithParam<MatInfo_Size_Flip_t> MatInfo_Size_Flip;
 
 #ifdef IMX2D_PERF_OCL_BENCHMARK
-// Benchmarks execution of OCL based resize algorithms
-OCL_PERF_TEST_P(MatInfo_Pair_Inter, oclResizeAllInterpolations,
+// Benchmarks execution of OCL based flip algorithms
+OCL_PERF_TEST_P(MatInfo_Size_Flip, oclFlipAllModes,
                 testing::Combine(
                     testing::Values(CV_8UC3, CV_8UC4),
-                    testing::Values(Size_Size_t(szVGA, sz1080p),
-                                    Size_Size_t(sz1080p, sz2160p),
-                                    Size_Size_t(sz1080p, szVGA),
-                                    Size_Size_t(szVGA, cv::Size(200, 200))),
-                    Inter::all()
+                    testing::Values(cv::Size(200, 200), szVGA, sz1080p, sz2160p),
+                    Flip_t::all()
                     )
                 )
 {
     int matType = get<0>(GetParam());
-    Size_Size_t sizes = get<1>(GetParam());
-    Size from = get<0>(sizes);
-    Size to = get<1>(sizes);
-    int inter = get<2>(GetParam());
+    Size size = get<1>(GetParam());
+    int flipType = get<2>(GetParam());
+    int flipCode;
 
-    Mat src(from, matType);
+    Mat src(size, matType);
     cvtest::fillGradient(src);
     UMat usrc = src.getUMat(ACCESS_WRITE);
-    UMat udst(to, matType);
+    UMat udst(size, matType);
+
+    if (flipType == FLIP_HORIZONTAL)
+        flipCode = 1;
+    else if (flipType == FLIP_VERTICAL)
+        flipCode = 0;
+    else // flipType == FLIP_BOTH
+        flipCode = -1;
 
     OCL_TEST_CYCLE_N(10)
     {
-        resize(usrc, udst, to, 0, 0, inter);
+        flip(usrc, udst, flipCode);
     }
 
     SANITY_CHECK_NOTHING();
 }
+
 #endif // IMX2D_PERF_OCL_BENCHMARK
 
 

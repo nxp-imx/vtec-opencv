@@ -27,6 +27,16 @@
     #define DSO_LOCAL  __attribute__ ((visibility ("hidden")))
 #endif
 
+
+#ifdef DEBUG
+#define IMX2D_DEBUG(fmt, ...) printf(fmt "\n", ##__VA_ARGS__)
+#else
+#define IMX2D_DEBUG(fmt, ...)
+#endif
+#define IMX2D_INFO(fmt, ...) printf(fmt "\n", ##__VA_ARGS__)
+#define IMX2D_ERROR(fmt, ...) fprintf(stderr, fmt "\n", ##__VA_ARGS__)
+
+
 namespace cv {
 namespace imx2d {
 
@@ -158,7 +168,9 @@ public:
      @brief HAL primitives
     */
     enum Primitive {
+        FLIP,
         RESIZE,
+        ROTATE,
         PRIMITIVES_MAX
     };
 
@@ -168,15 +180,39 @@ public:
     /**
      @brief Increment primitive usage counter
     */
-    void incrementCount(Imx2dHalCounters::Primitive primitive);
+    void incrementCount(Primitive primitive);
 
     /**
      @brief Read primitive usage counter
     */
-    unsigned readCount(Imx2dHalCounters::Primitive primitive);
+    unsigned readCount(Primitive primitive);
 
 protected:
     std::atomic<unsigned>counters[PRIMITIVES_MAX];
+};
+
+
+/**
+@brief Describes hardware accelerator capabilities
+*/
+
+class DSO_EXPORT HardwareCapabilities {
+public:
+    HardwareCapabilities();
+
+    /**
+     @brief Hardware features
+    */
+    enum Capabilities {
+        THREE_CHANNELS,
+        CAPABILITY_MAX
+    };
+    bool hasSupport();
+    bool hasCapability(Capabilities cap);
+
+private:
+    bool supported;
+    bool caps[CAPABILITY_MAX];
 };
 
 
@@ -205,14 +241,7 @@ public:
     /**
      @brief Returns HAL hardware support
     */
-    class HardwareFeatures {
-    public:
-        HardwareFeatures();
-
-        bool valid;
-        bool threeChannels;
-    };
-    HardwareFeatures& getHardwareFeatures();
+    HardwareCapabilities& getHardwareCapabilities();
 
     /**
      @brief Returns G2D handle created when HAL is enabled
@@ -233,7 +262,7 @@ protected:
     bool enabled;
     std::mutex mutex;
     void* g2dHandle;
-    HardwareFeatures hwFeatures;
+    HardwareCapabilities hwCapabilities;
 };
 
 
