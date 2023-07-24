@@ -25,6 +25,16 @@ MODULES=${MODULES:-"dw100 imx2d"}
 VERBOSE=${VERBOSE:-"OFF"}
 TINY=${TINY:-"OFF"}
 
+PATCHES_DIR=${VTEC_DIR}/patches
+declare -a PATCH_FILE=(
+    "0001-core-Add-HAL-hook-for-flip-function.patch"
+    "0002-core-Add-HAL-hook-for-rotate-function.patch"
+)
+declare -a PATCH_SUBTREE=(
+    "core"
+    "core"
+)
+
 
 TAG=4.7.0
 ROOTFS_DIR=
@@ -213,6 +223,13 @@ do_checkout () {
     do
         git -C "$dir" fetch
         git -C "$dir" checkout "${TAG}"
+    done
+
+    for index in "${!PATCH_FILE[@]}"; do
+        dir="${ROOT_DIR}/${PATCH_SUBTREE[$index]}"
+        patch="${PATCHES_DIR}/${PATCH_FILE["$index"]}"
+        echo "[$dir] applying patch: $patch"
+        git -C "$dir" am "$patch"
     done
 }
 
