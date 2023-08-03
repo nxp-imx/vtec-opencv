@@ -174,7 +174,6 @@ source_SDK () {
             EXTRA_OPTS="-DCMAKE_TOOLCHAIN_FILE=${OECORE_NATIVE_SYSROOT}/share/buildroot/toolchainfile.cmake"
         else
             echo "Poky toolchain detected"
-            EXTRA_OPTS="-DCMAKE_TOOLCHAIN_FILE=${OECORE_NATIVE_SYSROOT}/usr/share/cmake/armv8a-poky-linux-toolchain.cmake"
             if [ -n $(find "$SDKTARGETSYSROOT/usr/lib/cmake" -type d -regex '.*lib/cmake/Qt[0-9]+') ];
             then
                 QT_EXTRA_OPTS="-DWITH_QT=ON"
