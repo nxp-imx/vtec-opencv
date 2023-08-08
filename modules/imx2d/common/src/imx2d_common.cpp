@@ -23,7 +23,7 @@
 #include <unistd.h>
 #include <vector>
 
-#define DEBUG
+//#define DEBUG
 #include "imx2d_common.hpp"
 
 #include "g2d.h"
