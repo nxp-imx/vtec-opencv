@@ -1,8 +1,11 @@
 NXP Software Content Register
 
-Package:                  OpenCV NXP Edge Processing modules
-Data Created:             2022 March 18
+Package:                  vtec-opencv.git
+Description and comments: OpenCV NXP Edge Processing modules
+Version:                  0.3
+Release Location:         https://github.com/nxp-imx/vtec-opencv
 Outgoing License:         Apache 2.0
+License file:             LICENSE
 Type of content:          Source code
 
 -------------------------------------------------------------------------------
