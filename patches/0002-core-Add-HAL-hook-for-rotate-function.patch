@@ -1,4 +1,4 @@
-From 666029e17e3ef7b07db967304d89a1ca08b5aa15 Mon Sep 17 00:00:00 2001
+From 20b581619c0295b46295885e490ccb33bad25bfa Mon Sep 17 00:00:00 2001
 From: Julien Vuillaumier <julien.vuillaumier@nxp.com>
 Date: Wed, 26 Jul 2023 10:23:28 +0200
 Subject: [PATCH 2/2] core: Add HAL hook for rotate() function
@@ -38,9 +38,9 @@ void rotate( int src_type, const uchar* src_data, size_t src_step,
              int angle);
 ---
  modules/core/include/opencv2/core/hal/hal.hpp |  1 +
- modules/core/src/hal_replacement.hpp          | 23 +++++++++++++++
- modules/core/src/matrix_transform.cpp         | 29 +++++++++++++++++++
- 3 files changed, 53 insertions(+)
+ modules/core/src/hal_replacement.hpp          | 23 +++++++++
+ modules/core/src/matrix_transform.cpp         | 48 ++++++++++++++++++-
+ 3 files changed, 71 insertions(+), 1 deletion(-)
 
 diff --git a/modules/core/include/opencv2/core/hal/hal.hpp b/modules/core/include/opencv2/core/hal/hal.hpp
 index b7e96d770a..68b095aad0 100644
@@ -89,18 +89,39 @@ index 8ed0e56661..7efc445ee9 100644
  
  
 diff --git a/modules/core/src/matrix_transform.cpp b/modules/core/src/matrix_transform.cpp
-index d0e11c6adb..a8c9373239 100644
+index d0e11c6adb..97444e8216 100644
 --- a/modules/core/src/matrix_transform.cpp
 +++ b/modules/core/src/matrix_transform.cpp
-@@ -864,6 +864,35 @@ void flipND(InputArray _src, OutputArray _dst, int _axis)
- void rotate(InputArray _src, OutputArray _dst, int rotateMode)
+@@ -861,7 +861,7 @@ void flipND(InputArray _src, OutputArray _dst, int _axis)
+     flipNDImpl(dst.ptr(), dst.size.p, dst.step.p, axis);
+ }
+ 
+-void rotate(InputArray _src, OutputArray _dst, int rotateMode)
++static void rotateImpl(InputArray _src, OutputArray _dst, int rotateMode)
  {
      CV_Assert(_src.dims() <= 2);
-+    Size size = _src.size();
+ 
+@@ -883,4 +883,50 @@ void rotate(InputArray _src, OutputArray _dst, int rotateMode)
+     }
+ }
+ 
++void rotate(InputArray _src, OutputArray _dst, int rotateMode)
++{
 +    int angle;
++
++    if (_dst.isUMat())
++    {
++        rotateImpl(_src, _dst, rotateMode);
++        return;
++    }
 +
 +    Mat src = _src.getMat();
 +    int type = src.type();
++    if( src.empty() )
++    {
++        _dst.release();
++        return;
++    }
 +
 +    switch (rotateMode)
 +    {
@@ -109,7 +130,7 @@ index d0e11c6adb..a8c9373239 100644
 +        angle = 90;
 +        break;
 +    case ROTATE_180:
-+        _dst.create(size, type);
++        _dst.create(src.rows, src.cols, type);
 +        angle = 180;
 +        break;
 +    case ROTATE_90_COUNTERCLOCKWISE:
@@ -117,17 +138,20 @@ index d0e11c6adb..a8c9373239 100644
 +        angle = 270;
 +        break;
 +    default:
-+        _dst.create(size, type);
++        _dst.create(src.rows, src.cols, type);
 +        angle = 0;
 +        break;
 +    }
-+    Mat dst = _dst.getMat();
 +
++    Mat dst = _dst.getMat();
 +    CALL_HAL(rotate, cv_hal_rotate, type, src.ptr(), src.step, src.cols, src.rows,
 +             dst.ptr(), dst.step, angle);
- 
-     switch (rotateMode)
-     {
++
++    // use src (Mat) since _src (InputArray) is updated by _dst.create() when in-place
++    rotateImpl(src, _dst, rotateMode);
++}
++
+ }  // namespace
 -- 
 2.25.1
 

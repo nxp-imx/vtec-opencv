@@ -1,4 +1,4 @@
-From 5cd8637e804b4bcb750a93488ebd25973188e4a5 Mon Sep 17 00:00:00 2001
+From e58d73c45c5ee6b6424347d1e3a97d8f68f40ccb Mon Sep 17 00:00:00 2001
 From: Julien Vuillaumier <julien.vuillaumier@nxp.com>
 Date: Thu, 20 Jul 2023 19:07:48 +0200
 Subject: [PATCH 1/2] core: Add HAL hook for flip() function
