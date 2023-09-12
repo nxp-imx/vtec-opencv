@@ -46,7 +46,7 @@ const std::string keys  =
         "{oh             | -1     | output video height (negative means no height resize) }"
         "{rotate         | 0      | rotate mode (degrees clockwise) 0:none 1:90 2:180 3:270 }"
         "{imx2d          | true   | i.MX 2D acceleration }"
-        "{alloc          | true   | i.MX 2D custom allocator enabled }"
+        "{alloc          | true   | i.MX 2D graphic allocator enabled }"
         ;
 }
 
