@@ -1,7 +1,7 @@
 ## Repository for NXP Edge Processing OpenCV's extra modules
 
 This repository is delivering openCV extra modules offering hardware
-acceleration on NXP i.MX8 System On Chip.
+acceleration on NXP i.MX8/i.MX9 System On Chip.
 
 ## Getting started
 
@@ -68,7 +68,8 @@ Restricts to the minimum the list of modules included in the build
 ### Exporting the linux kernel headers
 
 You might have to export the linux kernel headers to use latest features of some
-modules.
+modules. That is expected in case `warp` module is built with an SDK whose Linux
+kernel version is older than v6.1.
 
 ```console
 make -C ${KDIR} ARCH=arm64 INSTALL_HDR_PATH=$(find "${SDK_DIR}" -type d -name sysroot*)/usr/src/kernels headers_install
