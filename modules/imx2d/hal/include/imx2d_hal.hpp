@@ -81,8 +81,8 @@ inline int __imx2d_flip(int src_type, const uchar* src_data, size_t src_step,
 }
 
 
-#undef cv_hal_rotate
-#define cv_hal_rotate __imx2d_rotate
+#undef cv_hal_rotate90
+#define cv_hal_rotate90 __imx2d_rotate
 
 enum {
     IMX2D_ROTATE_NONE,
