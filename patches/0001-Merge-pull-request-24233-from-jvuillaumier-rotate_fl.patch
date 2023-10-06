@@ -1,0 +1,172 @@
+From 2064e56adf6ba6a1761573b95a057a6593095d66 Mon Sep 17 00:00:00 2001
+From: jvuillaumier <julien.vuillaumier@gmail.com>
+Date: Fri, 6 Oct 2023 11:31:53 +0200
+Subject: [PATCH] Merge pull request #24233 from
+ jvuillaumier:rotate_flip_hal_hooks
+
+Add HAL implementation hooks to cv::flip() and cv::rotate() functions from core module #24233
+
+Hello,
+
+This change proposes the addition of HAL hooks for cv::flip() and cv::rotate() functions from OpenCV core module.
+Flip and rotation are functions commonly available from 2D hardware accelerators. This is convenient provision to enable custom optimized implementation of image flip/rotation on systems embedding such accelerator.
+
+Thank you
+
+### Pull Request Readiness Checklist
+
+See details at https://github.com/opencv/opencv/wiki/How_to_contribute#making-a-good-pull-request
+
+- [x] I agree to contribute to the project under Apache 2 License.
+- [x] To the best of my knowledge, the proposed patch is not based on a code under GPL or another license that is incompatible with OpenCV
+- [x] The PR is proposed to the proper branch
+- [ ] There is a reference to the original bug report and related work
+- [ ] There is accuracy test, performance test and test data in opencv_extra repository, if applicable
+      Patch to opencv_extra has the same branch name.
+- [ ] The feature is well documented and sample code can be built with the project CMake
+---
+ modules/core/src/hal_replacement.hpp  | 41 ++++++++++++++++++++
+ modules/core/src/matrix_transform.cpp | 55 +++++++++++++++++++++++++--
+ 2 files changed, 93 insertions(+), 3 deletions(-)
+
+diff --git a/modules/core/src/hal_replacement.hpp b/modules/core/src/hal_replacement.hpp
+index 6ed795b5e1..aad63eb8e4 100644
+--- a/modules/core/src/hal_replacement.hpp
++++ b/modules/core/src/hal_replacement.hpp
+@@ -731,6 +731,47 @@ inline int hal_ni_minMaxIdx(const uchar* src_data, size_t src_step, int width, i
+ #define cv_hal_minMaxIdx hal_ni_minMaxIdx
+ //! @endcond
+ 
++/**
++   @brief hal_flip
++   @param src_type source and destination image type
++   @param src_data source image data
++   @param src_step source image step
++   @param src_width source and destination image width
++   @param src_height source and destination image height
++   @param dst_data destination image data
++   @param dst_step destination image step
++   @param flip_mode 0 flips around x-axis, positive around y-axis, negative both
++ */
++inline int hal_ni_flip(int src_type, const uchar* src_data, size_t src_step, int src_width, int src_height,
++                       uchar* dst_data, size_t dst_step, int flip_mode) { return CV_HAL_ERROR_NOT_IMPLEMENTED; }
++
++//! @cond IGNORED
++#define cv_hal_flip hal_ni_flip
++//! @endcond
++
++
++/**
++   @brief rotate90
++   @param src_type source and destination image type
++   @param src_data source image data
++   @param src_step source image step
++   @param src_width source image width
++   If angle has value [180] it is also destination image width
++   If angle has values [90, 270] it is also destination image height
++   @param src_height source and destination image height (destination image width for angles [90, 270])
++   If angle has value [180] it is also destination image height
++   If angle has values [90, 270] it is also destination image width
++   @param dst_data destination image data
++   @param dst_step destination image step
++   @param angle clockwise angle for rotation in degrees from set [90, 180, 270]
++ */
++inline int hal_ni_rotate90(int src_type, const uchar* src_data, size_t src_step, int src_width, int src_height,
++                           uchar* dst_data, size_t dst_step, int angle) { return CV_HAL_ERROR_NOT_IMPLEMENTED; }
++
++//! @cond IGNORED
++#define cv_hal_rotate90 hal_ni_rotate90
++//! @endcond
++
+ //! @}
+ 
+ 
+diff --git a/modules/core/src/matrix_transform.cpp b/modules/core/src/matrix_transform.cpp
+index 57fd0c6509..ddb5acb262 100644
+--- a/modules/core/src/matrix_transform.cpp
++++ b/modules/core/src/matrix_transform.cpp
+@@ -4,6 +4,7 @@
+ 
+ #include "precomp.hpp"
+ #include "opencl_kernels_core.hpp"
++#include "hal_replacement.hpp"
+ #include "opencv2/core/detail/dispatch_helper.impl.hpp"
+ 
+ #include <algorithm> // std::swap_ranges
+@@ -801,6 +802,9 @@ void flip( InputArray _src, OutputArray _dst, int flip_mode )
+     _dst.create( size, type );
+     Mat dst = _dst.getMat();
+ 
++    CALL_HAL(flip, cv_hal_flip, type, src.ptr(), src.step, src.cols, src.rows,
++             dst.ptr(), dst.step, flip_mode);
++
+     CV_IPP_RUN_FAST(ipp_flip(src, dst, flip_mode));
+ 
+     size_t esz = CV_ELEM_SIZE(type);
+@@ -857,10 +861,8 @@ void flipND(InputArray _src, OutputArray _dst, int _axis)
+     flipNDImpl(dst.ptr(), dst.size.p, dst.step.p, axis);
+ }
+ 
+-void rotate(InputArray _src, OutputArray _dst, int rotateMode)
++static void rotateImpl(InputArray _src, OutputArray _dst, int rotateMode)
+ {
+-    CV_Assert(_src.dims() <= 2);
+-
+     switch (rotateMode)
+     {
+     case ROTATE_90_CLOCKWISE:
+@@ -879,4 +881,51 @@ void rotate(InputArray _src, OutputArray _dst, int rotateMode)
+     }
+ }
+ 
++void rotate(InputArray _src, OutputArray _dst, int rotateMode)
++{
++    CV_Assert(_src.dims() <= 2);
++    int angle;
++
++    if (_dst.isUMat())
++    {
++        rotateImpl(_src, _dst, rotateMode);
++        return;
++    }
++
++    Mat src = _src.getMat();
++    int type = src.type();
++    if( src.empty() )
++    {
++        _dst.release();
++        return;
++    }
++
++    switch (rotateMode)
++    {
++    case ROTATE_90_CLOCKWISE:
++        _dst.create(src.cols, src.rows, type);
++        angle = 90;
++        break;
++    case ROTATE_180:
++        _dst.create(src.rows, src.cols, type);
++        angle = 180;
++        break;
++    case ROTATE_90_COUNTERCLOCKWISE:
++        _dst.create(src.cols, src.rows, type);
++        angle = 270;
++        break;
++    default:
++        _dst.create(src.rows, src.cols, type);
++        angle = 0;
++        break;
++    }
++
++    Mat dst = _dst.getMat();
++    CALL_HAL(rotate90, cv_hal_rotate90, type, src.ptr(), src.step, src.cols, src.rows,
++             dst.ptr(), dst.step, angle);
++
++    // use src (Mat) since _src (InputArray) is updated by _dst.create() when in-place
++    rotateImpl(src, _dst, rotateMode);
++}
++
+ }  // namespace
+-- 
+2.34.1
+

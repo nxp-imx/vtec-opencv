@@ -27,11 +27,9 @@ TINY=${TINY:-"OFF"}
 
 PATCHES_DIR=${VTEC_DIR}/patches
 declare -a PATCH_FILE=(
-    "0001-core-Add-HAL-hook-for-flip-function.patch"
-    "0002-core-Add-HAL-hook-for-rotate-function.patch"
+    "0001-Merge-pull-request-24233-from-jvuillaumier-rotate_fl.patch"
 )
 declare -a PATCH_SUBTREE=(
-    "core"
     "core"
 )
 
